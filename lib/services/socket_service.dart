@@ -1,11 +1,10 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 enum ServerStatus { Online, Offline, Connecting }
 
-class SocketService extends ChangeNotifier {
-  SocketService() {
+class SocketService extends StateNotifier<ServerStatus> {
+  SocketService() : super(ServerStatus.Connecting) {
     _initConfig();
   }
   ServerStatus _serverStatus = ServerStatus.Connecting;
@@ -24,12 +23,12 @@ class SocketService extends ChangeNotifier {
     _socket.on('connect', (_) {
       //aqui tb puede ser socket.onConect :)
       _serverStatus = ServerStatus.Online;
-      notifyListeners();
+      state = _serverStatus;
     });
 
     _socket.onDisconnect((_) {
       _serverStatus = ServerStatus.Offline;
-      notifyListeners();
+      state = _serverStatus;
     });
 
     //   socket.on('new-message', (dynamic payload) {
@@ -44,7 +43,8 @@ class SocketService extends ChangeNotifier {
   }
 }
 
-final ChangeNotifierProvider<SocketService> socketServiceProvider =
-    ChangeNotifierProvider<SocketService>(
-  (ChangeNotifierProviderRef<Object?> ref) => SocketService(),
+final StateNotifierProvider<SocketService, ServerStatus> socketServiceProvider =
+    StateNotifierProvider<SocketService, ServerStatus>(
+  (StateNotifierProviderRef<SocketService, ServerStatus> ref) =>
+      SocketService(),
 );

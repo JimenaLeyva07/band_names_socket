@@ -14,14 +14,14 @@ class ServerStatusPage extends ConsumerWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             Text(
-              'Server Status: ${ref.watch(socketServiceProvider).serverStatus}',
+              'Server Status: ${ref.watch(socketServiceProvider)}',
             )
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          ref.read(socketServiceProvider).socket.emit(
+          ref.read(socketServiceProvider.notifier).socket.emit(
             'emiting-message',
             <String, String>{'name': 'Jimena', 'message': 'Hey ;) '},
           );

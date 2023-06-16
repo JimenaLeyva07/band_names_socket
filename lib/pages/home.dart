@@ -4,7 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pie_chart/pie_chart.dart';
-import 'package:socket_io_client/src/socket.dart';
+import 'package:socket_io_client/socket_io_client.dart';
 
 import '../models/band_model.dart';
 import '../services/socket_service.dart';
@@ -22,19 +22,16 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   void initState() {
     super.initState();
-    ref.read(socketServiceProvider).socket.on('active-bands',
+    ref.read(socketServiceProvider.notifier).socket.on('active-bands',
         (dynamic payload) {
-      _handleActiveBands(payload);
+      bands = (payload as List<dynamic>)
+          .map(
+            (dynamic band) => BandModel.fromJson(band as Map<String, dynamic>),
+          )
+          .toList();
+      setState(() {});
+      // _handleActiveBands(payload);
     });
-  }
-
-  dynamic _handleActiveBands(dynamic payload) {
-    bands = (payload as List<dynamic>)
-        .map(
-          (dynamic band) => BandModel.fromJson(band as Map<String, dynamic>),
-        )
-        .toList();
-    setState(() {});
   }
 
   @override
@@ -48,34 +45,38 @@ class _HomePageState extends ConsumerState<HomePage> {
           style: TextStyle(color: Colors.black),
         ),
         actions: <Widget>[
-          Consumer(
-            builder: (BuildContext context, WidgetRef ref, Widget? child) {
-              final ServerStatus serverStatus =
-                  ref.watch(socketServiceProvider).serverStatus;
-              return Container(
-                margin: const EdgeInsets.only(right: 10),
-                child: serverStatus == ServerStatus.Online
-                    ? Icon(
-                        Icons.check_circle,
-                        color: Colors.green[300],
-                      )
-                    : Icon(
-                        Icons.offline_bolt,
-                        color: Colors.red[300],
-                      ),
-              );
-            },
-          )
+          Container(
+            margin: const EdgeInsets.only(right: 10),
+            child: ref.watch(socketServiceProvider) == ServerStatus.Online
+                ? Icon(
+                    Icons.check_circle,
+                    color: Colors.green[300],
+                  )
+                : Icon(
+                    Icons.offline_bolt,
+                    color: Colors.red[300],
+                  ),
+          ),
         ],
       ),
       body: Column(
         children: <Widget>[
-          _showPieChartWidet(),
+          if (bands.isNotEmpty)
+            PieChartWidget(
+              bands: bands,
+              colorList: const <Color>[
+                Color(0xFF0671B7),
+                Color(0xFF67A3D9),
+                Color(0xFFC8E7F5),
+                Color.fromARGB(255, 238, 180, 203),
+                Color.fromARGB(255, 250, 139, 176),
+              ],
+            ),
           Expanded(
             child: ListView.builder(
               itemCount: bands.length,
               itemBuilder: (BuildContext context, int index) =>
-                  _bandTile(bands[index]),
+                  BandTile(bandModel: bands[index]),
             ),
           ),
         ],
@@ -84,45 +85,6 @@ class _HomePageState extends ConsumerState<HomePage> {
         onPressed: addNewBand,
         elevation: 1.5,
         child: const Icon(Icons.add),
-      ),
-    );
-  }
-
-  Widget _bandTile(BandModel bandModel) {
-    final Socket socketRead = ref.read(socketServiceProvider).socket;
-    return Dismissible(
-      key: Key(bandModel.id),
-      direction: DismissDirection.startToEnd,
-      onDismissed: (DismissDirection direction) =>
-          socketRead.emit('delete-band', <String, String>{'id': bandModel.id}),
-      background: Container(
-        padding: const EdgeInsets.only(left: 8.0),
-        color: Colors.red,
-        child: const Align(
-          alignment: Alignment.centerLeft,
-          child: Row(
-            children: <Widget>[
-              Icon(
-                Icons.delete,
-                color: Colors.white,
-              ),
-              Text(
-                ' Delete',
-                style: TextStyle(color: Colors.white),
-              )
-            ],
-          ),
-        ),
-      ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Colors.blue[100],
-          child: Text(bandModel.name.substring(0, 2)),
-        ),
-        title: Text(bandModel.name),
-        trailing: Text('${bandModel.votes}'),
-        onTap: () =>
-            socketRead.emit('vote-band', <String, dynamic>{'id': bandModel.id}),
       ),
     );
   }
@@ -178,14 +140,25 @@ class _HomePageState extends ConsumerState<HomePage> {
   void addArtistToList(String name) {
     if (name.length > 1) {
       ref
-          .read(socketServiceProvider)
+          .read(socketServiceProvider.notifier)
           .socket
           .emit('add-band', <String, String>{'name': name});
     }
     Navigator.pop(context);
   }
+}
 
-  Widget _showPieChartWidet() {
+class PieChartWidget extends StatelessWidget {
+  const PieChartWidget({
+    required this.bands,
+    required this.colorList,
+    super.key,
+  });
+  final List<BandModel> bands;
+  final List<Color> colorList;
+
+  @override
+  Widget build(BuildContext context) {
     final Map<String, double> dataMap = <String, double>{};
 
     for (final BandModel band in bands) {
@@ -194,14 +167,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       };
       dataMap.addEntries(newEntrie.entries);
     }
-
-    final List<Color> colorList = <Color>[
-      const Color(0xFF0671B7),
-      const Color(0xFF67A3D9),
-      const Color(0xFFC8E7F5),
-      const Color.fromARGB(255, 238, 180, 203),
-      const Color.fromARGB(255, 250, 139, 176),
-    ];
 
     return SizedBox(
       height: 200,
@@ -230,31 +195,51 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 }
 
-// class PieChartWidget extends StatelessWidget {
-//   const PieChartWidget({
-//     required this.bands,
-//     super.key,
-//   });
-//   final List<BandModel> bands;
+class BandTile extends ConsumerWidget {
+  const BandTile({
+    required this.bandModel,
+    super.key,
+  });
 
-//   @override
-//   Widget build(BuildContext context) {
-//     final Map<String, double> dataMap = <String, double>{};
+  final BandModel bandModel;
 
-//     print('BANDAS $bands');
-//     for (final BandModel band in bands) {
-//       final Map<String, double> newEntrie = <String, double>{
-//         band.name: band.votes.toDouble()
-//       };
-//       print('ENTRIE: $newEntrie');
-//       dataMap.addEntries(newEntrie.entries);
-//     }
-//     print('DATAMAP : $dataMap');
-
-//     return SizedBox(
-//       height: 200,
-//       width: double.infinity,
-//       child: PieChart(dataMap: dataMap),
-//     );
-//   }
-// }
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final Socket socketRead = ref.read(socketServiceProvider.notifier).socket;
+    return Dismissible(
+      key: Key(bandModel.id),
+      direction: DismissDirection.startToEnd,
+      onDismissed: (DismissDirection direction) =>
+          socketRead.emit('delete-band', <String, String>{'id': bandModel.id}),
+      background: Container(
+        padding: const EdgeInsets.only(left: 8.0),
+        color: Colors.red,
+        child: const Align(
+          alignment: Alignment.centerLeft,
+          child: Row(
+            children: <Widget>[
+              Icon(
+                Icons.delete,
+                color: Colors.white,
+              ),
+              Text(
+                ' Delete',
+                style: TextStyle(color: Colors.white),
+              )
+            ],
+          ),
+        ),
+      ),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: Colors.blue[100],
+          child: Text(bandModel.name.substring(0, 2)),
+        ),
+        title: Text(bandModel.name),
+        trailing: Text('${bandModel.votes}'),
+        onTap: () =>
+            socketRead.emit('vote-band', <String, dynamic>{'id': bandModel.id}),
+      ),
+    );
+  }
+}
