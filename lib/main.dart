@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:band_names/pages/home.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-void main() => runApp(const MyApp());
+import 'pages/home.dart';
+import 'pages/server_status.dart';
+
+void main() => runApp(const ProviderScope(child: MyApp()));
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -17,7 +20,10 @@ class MyApp extends StatelessWidget {
           title: const Text('Material App Bar'),
         ),
       ),
-      routes: {'home': (_) => const HomePage()},
+      routes: <String, Widget Function(BuildContext)>{
+        'home': (_) => const HomePage(),
+        'status': (_) => const ServerStatusPage()
+      },
     );
   }
 }
